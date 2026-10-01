@@ -16,6 +16,7 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS") or ["localhost", "127.0.0.1"]
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
 ORS_API_KEY = os.getenv("ORS_API_KEY", "")
+MOCK_GEO = os.getenv("MOCK_GEO", "True") == "True"  # serve recorded routes, no ORS calls
 
 INSTALLED_APPS = ["corsheaders", "trips"]
 

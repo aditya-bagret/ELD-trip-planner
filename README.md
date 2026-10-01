@@ -52,6 +52,8 @@ uv run python manage.py runserver        # http://localhost:8000
 uv run python manage.py test trips       # HOS engine tests
 ```
 
+**Demo mode (on by default, no ORS key needed):** with `MOCK_GEO=True` the API serves real ORS truck routes recorded between 18 cities (Seattle, Los Angeles, Phoenix, Denver, Dallas, Houston, Oklahoma City, Tulsa, Kansas City, St. Louis, Chicago, Memphis, Nashville, Atlanta, Indianapolis, Columbus, Philadelphia, New York) from `trips/mock_data.json`, with no network calls. Any combination of those cities works; stops are named after the nearest recorded town. Set `MOCK_GEO=False` to use live ORS lookups for any address.
+
 ```bash
 cd frontend
 cp .env.example .env          # VITE_API_URL=http://localhost:8000
@@ -67,6 +69,7 @@ backend/
   trips/
     views.py         POST /api/trip/ (validation + orchestration), GET /api/health/
     geo.py           OpenRouteService client: geocode, route, reverse geocode
+    mock_geo.py      offline stand-in for geo.py (MOCK_GEO=True), reads mock_data.json
     hos.py           pure HOS simulation engine (no I/O)
     logs.py          pure: events -> daily sheets, totals, recap, remarks, map stops
     constants.py     every HOS number and assumption

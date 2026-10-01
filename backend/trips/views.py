@@ -2,11 +2,12 @@ import json
 import logging
 from datetime import date
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from . import geo
+from . import geo, mock_geo
 from .hos import simulate
 from .logs import build_daily_logs, build_stops, iso
 
@@ -61,15 +62,16 @@ def plan_trip(request):
 
 
 def _plan(data):
-    current, pickup, dropoff = (geo.geocode(data[f]) for f in LOCATION_FIELDS)
-    legs, route_line = geo.route([current, pickup, dropoff])
+    src = mock_geo if settings.MOCK_GEO else geo
+    current, pickup, dropoff = (src.geocode(data[f]) for f in LOCATION_FIELDS)
+    legs, route_line = src.route([current, pickup, dropoff])
     cycle_used = data["current_cycle_used"]
     events = simulate(legs, cycle_used, geo.make_locate(legs))
 
     # Stops at the three entered places keep their geocoded names; other stops get reverse-geocoded.
     known = {geo.coord_key(p["lat"], p["lng"]): p["name"] for p in (current, pickup, dropoff)}
     stops = [e for e in events if e["status"] != "driving"]
-    names = geo.reverse_geocode_many(
+    names = src.reverse_geocode_many(
         [(e["lat"], e["lng"]) for e in stops if geo.coord_key(e["lat"], e["lng"]) not in known])
     for e in stops:
         key = geo.coord_key(e["lat"], e["lng"])
