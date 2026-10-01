@@ -1,12 +1,24 @@
+from datetime import date
+
 from django.test import SimpleTestCase
 
+from .constants import (
+    BREAK_AFTER_DRIVE_MIN, BREAK_MIN, CYCLE_LIMIT_MIN, FUEL_EVERY_MILES,
+    MAX_DRIVE_MIN, REST_MIN, RESTART_MIN, WINDOW_MIN,
+)
 from .hos import simulate
+from .logs import build_daily_logs, build_stops
+
+# lat -> name; mid-route stops (dummy locate) sit at lat 0
+NAMES = {1.0: "Dallas, TX", 2.0: "Oklahoma City, OK", 3.0: "Chicago, IL", 0.0: "Joplin, MO"}
+START = date(2026, 10, 1)
 
 
 def legs(*miles):
-    """Legs at a fixed 50 mph (HOS_ENGINE §8)."""
-    loc = {"name": "X", "lat": 0.0, "lng": 0.0}
-    return [{"miles": m, "hours": m / 50, "start": loc, "end": loc} for m in miles]
+    """Legs at a fixed 50 mph (HOS_ENGINE §8): current -> pickup -> dropoff."""
+    locs = [{"name": NAMES[lat], "lat": lat, "lng": 0.0} for lat in (1.0, 2.0, 3.0)]
+    return [{"miles": m, "hours": m / 50, "start": locs[i], "end": locs[i + 1]}
+            for i, m in enumerate(miles)]
 
 
 def locate(leg_index, miles_into_leg):
@@ -21,6 +33,7 @@ def t(s):
 
 
 OFF, SB, DR, ON = "off_duty", "sleeper", "driving", "on_duty"
+
 
 class SimulateTimelineTests(SimpleTestCase):
     def check(self, events, expected):
@@ -121,3 +134,138 @@ class SimulateTimelineTests(SimpleTestCase):
             (OFF, "off_duty", "3.01:00", "4.00:00"),
         ])
         self.assertAlmostEqual(sum(e["miles"] for e in events), 200)
+
+
+def sheets_for(miles, cycle):
+    """Simulate, fake reverse geocoding of stops, build daily logs."""
+    events = simulate(legs(*miles), cycle, locate)
+    for e in events:
+        if e["status"] != "driving":
+            e["location"] = NAMES[e["lat"]]
+    return events, build_daily_logs(events, START, cycle, NAMES[1.0])
+
+
+def totals(sheet):
+    tt = sheet["totals"]
+    return (tt["off_duty"], tt["sleeper"], tt["driving"], tt["on_duty"])
+
+
+class DailyLogTests(SimpleTestCase):
+    def test_t1_sheet(self):
+        _, sheets = sheets_for((100, 200), 0)
+        self.assertEqual(len(sheets), 1)
+        s = sheets[0]
+        self.assertEqual(totals(s), (15.5, 0, 6, 2.5))
+        self.assertEqual(s["total_miles"], 300)
+        self.assertEqual((s["date"], s["day_number"]), ("2026-10-01", 1))
+        self.assertEqual((s["from"], s["to"]), ("Dallas, TX", "Chicago, IL"))
+        self.assertEqual(s["on_duty_today"], 8.5)
+        self.assertEqual(s["recap"], {"a": 8.5, "b": 61.5, "c": 8.5})
+        self.assertEqual(s["remarks"], [
+            {"start_min": 0, "end_min": 495, "location": "Dallas, TX",
+             "note": "Pre-trip inspection"},
+            {"start_min": 615, "end_min": 675, "location": "Oklahoma City, OK",
+             "note": "Pickup — loading"},
+            {"start_min": 915, "end_min": 1440, "location": "Chicago, IL",
+             "note": "Drop-off — unloading, Post-trip inspection"},
+        ])
+
+    def test_t2_totals(self):
+        events, sheets = sheets_for((50, 500), 0)
+        self.assertEqual([totals(s) for s in sheets], [(10.5, 0, 11, 2.5)])
+        stops = build_stops(events, START)
+        self.assertEqual([s["type"] for s in stops], ["pickup", "break", "dropoff"])
+        self.assertEqual(stops[1], {
+            "type": "break", "label": "30-min break",
+            "location": {"name": "Joplin, MO", "lat": 0.0, "lng": 0.0},
+            "start": "2026-10-01T18:15", "end": "2026-10-01T18:45", "duration_hours": 0.5,
+        })
+
+    def test_t3_totals_and_miles(self):
+        _, sheets = sheets_for((25, 600), 0)
+        self.assertEqual([totals(s) for s in sheets], [(8.5, 3, 11, 1.5), (14, 7, 1.5, 1.5)])
+        self.assertEqual([s["total_miles"] for s in sheets], [550, 75])
+        self.assertEqual([(s["from"], s["to"]) for s in sheets],
+                         [("Dallas, TX", "Joplin, MO"), ("Joplin, MO", "Chicago, IL")])
+        self.assertEqual(sheets[1]["remarks"][0], {
+            "start_min": 0, "end_min": 435, "location": "Joplin, MO",
+            "note": "(cont.) 10-hr rest (sleeper), Pre-trip inspection",
+        })
+
+    def test_t4_totals(self):
+        events, sheets = sheets_for((0, 1100), 0)
+        self.assertEqual([totals(s) for s in sheets], [(8.5, 3, 11, 1.5), (4, 7, 11, 2)])
+        self.assertEqual([s["type"] for s in build_stops(events, START)].count("fuel"), 1)
+
+    def test_t5_totals_and_recap(self):
+        _, sheets = sheets_for((0, 200), 68)
+        self.assertEqual([totals(s) for s in sheets],
+                         [(21.75, 0, 0.75, 1.5), (20.25, 0, 3.25, 0.5), (23, 0, 0, 1)])
+        # cycle resets when the 34-h restart completes (Day 2 20:15)
+        self.assertEqual([s["recap"]["a"] for s in sheets], [70.25, 3.75, 4.75])
+        self.assertEqual(sheets[0]["recap"]["b"], 0)
+        self.assertEqual(sheets[2]["remarks"][0]["note"],
+                         "(cont.) Drop-off — unloading, Post-trip inspection")
+
+
+TRIPS = [((100, 200), 0), ((50, 500), 0), ((25, 600), 0), ((0, 1100), 0), ((0, 200), 68),
+         ((100, 2400), 60)]
+
+
+class InvariantTests(SimpleTestCase):
+    def check_hos(self, events, cycle_used_hours):
+        """Replay events independently and check no driving breaks a limit."""
+        cycle = round(cycle_used_hours * 60)
+        shift_start, drive_shift, since_break = None, 0, 0
+        nondrive, off, since_fuel = 0, 0, 0.0
+        for e in events:
+            m = e["end"] - e["start"]
+            if e["status"] in ("driving", "on_duty"):
+                if shift_start is None:
+                    shift_start = e["start"]
+                cycle += m
+                off = 0
+            else:
+                off += m
+                if off >= REST_MIN:
+                    shift_start, drive_shift = None, 0
+                if off >= RESTART_MIN:
+                    cycle = 0
+            if e["status"] == "driving":
+                nondrive = 0
+                drive_shift += m
+                since_break += m
+                since_fuel += e["miles"]
+                self.assertLessEqual(drive_shift, MAX_DRIVE_MIN)
+                self.assertLessEqual(e["end"] - shift_start, WINDOW_MIN)
+                self.assertLessEqual(since_break, BREAK_AFTER_DRIVE_MIN)
+                self.assertLessEqual(cycle, CYCLE_LIMIT_MIN)
+                self.assertLessEqual(since_fuel, FUEL_EVERY_MILES + 1e-6)
+            else:
+                nondrive += m
+                if nondrive >= BREAK_MIN:
+                    since_break = 0
+            if e["type"] == "fuel":
+                since_fuel = 0.0
+
+    def test_invariants(self):
+        for miles, cycle in TRIPS:
+            with self.subTest(miles=miles, cycle=cycle):
+                events, sheets = sheets_for(miles, cycle)
+                self.check_hos(events, cycle)
+                self.assertAlmostEqual(sum(s["total_miles"] for s in sheets), sum(miles), 0)
+                for s in sheets:
+                    self.assertEqual(round(sum(s["totals"].values()), 2), 24)
+                    segs = s["segments"]
+                    self.assertEqual(segs[0]["start_min"], 0)
+                    self.assertEqual(segs[-1]["end_min"], 1440)
+                    for a, b in zip(segs, segs[1:]):
+                        self.assertEqual(a["end_min"], b["start_min"])
+                        self.assertNotEqual(a["status"], b["status"])
+
+    def test_long_trip_rests(self):
+        events, sheets = sheets_for((100, 2400), 60)
+        types = [e["type"] for e in events]
+        self.assertGreaterEqual(types.count("fuel"), 2)
+        self.assertIn("restart", types)
+        self.assertGreater(len(sheets), 3)
