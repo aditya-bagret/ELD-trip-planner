@@ -3,3 +3,26 @@
 @theme {
   --font-sans: "Inter", system-ui, sans-serif;
 }
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+/* Indeterminate loading bar across the top of the map */
+@keyframes progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.progress-bar {
+  animation: progress 1.2s ease-in-out infinite;
+}
+
+/* Below lg: phones pinch-zoom, and Leaflet's bottom controls (attribution) sit above the peek sheet */
+@media (max-width: 1023px) {
+  .leaflet-control-zoom {
+    display: none;
+  }
+  .leaflet-bottom {
+    bottom: calc(224px + env(safe-area-inset-bottom));
+  }
+}
