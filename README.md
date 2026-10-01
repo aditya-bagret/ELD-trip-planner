@@ -2,7 +2,7 @@
 
 A trip planner for property-carrying truck drivers. Enter your current location, pickup, drop-off and the hours already used in your 70-hour/8-day cycle. The app routes the trip and simulates it minute by minute under the FMCSA Hours-of-Service rules. It schedules every required fuel stop, 30-min break, 10-hour rest and 34-hour restart, shows them on a map, and draws a filled-in paper-style daily log sheet for each day of the trip. It's built with a Django API and a mobile-first React UI.
 
-**Live app:** https://YOUR-APP.vercel.app · **API:** https://YOUR-API.onrender.com/api/health/
+**Live app:** https://eld-trip-planner-dusky.vercel.app · **API:** https://eld-trip-planner-api-vmpb.onrender.com/api/health/
 
 > The API runs on Render's free tier and sleeps when idle, so the first request can take up to a minute.
 
