@@ -111,8 +111,10 @@ def simulate(legs, cycle_used_hours, locate):
                         CYCLE_LIMIT_MIN - sim.cycle, to_fuel)
             assert chunk >= 1, "HOS simulation stalled"
             miles = remaining if chunk == need else min(remaining, chunk * mph / 60)
-            if chunk == to_fuel and chunk < need:
-                miles = FUEL_EVERY_MILES - sim.miles_since_fuel
+            to_fuel_miles = FUEL_EVERY_MILES - sim.miles_since_fuel
+            # stop at the 1,000-mi mark even when the leg ends in the same (rounded-up) minute
+            if chunk == to_fuel and remaining - to_fuel_miles > 0.01:
+                miles = to_fuel_miles
 
             driven += miles
             remaining -= miles

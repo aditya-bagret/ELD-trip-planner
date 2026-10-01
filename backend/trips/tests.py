@@ -269,3 +269,9 @@ class InvariantTests(SimpleTestCase):
         self.assertGreaterEqual(types.count("fuel"), 2)
         self.assertIn("restart", types)
         self.assertGreater(len(sheets), 3)
+
+    def test_fuel_when_leg_ends_in_fuel_minute(self):
+        # 1,000.5 mi: the 1,000-mi mark and the drop-off fall in the same minute; still fuel first
+        events, _ = sheets_for((200.5, 800), 0)
+        self.check_hos(events, 0)
+        self.assertEqual([e["type"] for e in events].count("fuel"), 1)
