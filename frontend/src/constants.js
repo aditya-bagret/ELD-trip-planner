@@ -8,3 +8,11 @@ export const STOP_COLORS = {
   rest: '#7c3aed', // violet-600
   restart: '#64748b', // slate-500
 }
+
+// Log sheet header placeholders (DESIGN §5); home terminal = Day 1 "from"
+export const SHEET = {
+  carrier: 'Demo Carrier Inc.',
+  mainOffice: '—',
+  truck: 'Truck 101 / Trailer 201',
+  commodity: 'General freight',
+}

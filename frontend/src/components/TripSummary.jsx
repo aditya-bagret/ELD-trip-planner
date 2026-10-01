@@ -1,6 +1,6 @@
 import { formatDuration } from '../format'
 
-export default function TripSummary({ result, onEdit, onShowLogs }) {
+export default function TripSummary({ result, expanded, onToggle, onEdit, onShowLogs }) {
   const { summary, locations } = result
   const tiles = [
     ['Total miles', `${Math.round(summary.total_miles).toLocaleString()} mi`],
@@ -11,17 +11,25 @@ export default function TripSummary({ result, onEdit, onShowLogs }) {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate font-semibold text-slate-900">
-            {locations.current.name} → {locations.dropoff.name}
-          </h2>
-          <p className="truncate text-sm text-slate-500">via {locations.pickup.name}</p>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        {/* Tapping the header toggles the mobile sheet, like the handle (no-op on the desktop panel) */}
+        <h2 className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            className="-ml-2 block min-h-12 w-full rounded-lg px-2 py-0.5 text-left focus-visible:-outline-offset-2 lg:pointer-events-none"
+          >
+            <span className="block truncate font-semibold text-slate-900">
+              {locations.current.name} → {locations.dropoff.name}
+            </span>
+            <span className="block truncate text-sm text-slate-500">via {locations.pickup.name}</span>
+          </button>
+        </h2>
         <button
           type="button"
           onClick={onEdit}
-          className="-mr-2 -mt-2 h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+          className="-mr-2 h-12 shrink-0 rounded-xl px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 focus-visible:-outline-offset-2"
         >
           Edit
         </button>

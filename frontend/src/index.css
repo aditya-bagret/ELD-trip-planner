@@ -4,6 +4,14 @@
   --font-sans: "Inter", system-ui, sans-serif;
 }
 
+/* One visible focus ring for every control; inputs swap it for their own ring */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-blue-600);
+    outline-offset: 2px;
+  }
+}
+
 .leaflet-container {
   font-family: inherit;
 }
@@ -25,4 +33,13 @@
   .leaflet-bottom {
     bottom: calc(224px + env(safe-area-inset-bottom));
   }
+}
+
+/* Logs view slides up over the map */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.logs-enter {
+  animation: slide-up 200ms ease-out;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { planTrip, warmUp } from './api'
+import LogsView from './components/LogsView'
 import RouteMap from './components/RouteMap'
 import StopsList from './components/StopsList'
 import TripForm from './components/TripForm'
@@ -23,8 +24,9 @@ export default function App() {
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [showLogs, setShowLogs] = useState(false) // LogsView (Phase 7) reads this
+  const [showLogs, setShowLogs] = useState(false)
   const [focusStop, setFocusStop] = useState(null)
+  const panel = useRef(null)
   const panelBody = useRef(null)
 
   useEffect(() => { warmUp() }, [])
@@ -63,7 +65,7 @@ export default function App() {
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100 text-slate-600">
-      <RouteMap result={result} stops={stops} focusStop={focusStop} loading={loading} />
+      <RouteMap result={result} stops={stops} focusStop={focusStop} loading={loading} panel={panel} />
 
       <div className="absolute left-3 top-[calc(env(safe-area-inset-top)_+_12px)] z-10 flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm shadow-xl shadow-slate-900/10 lg:hidden">
         <Brand />
@@ -71,6 +73,7 @@ export default function App() {
 
       {/* One panel: bottom sheet below lg, floating side panel at lg+ */}
       <section
+        ref={panel}
         aria-label={editing ? 'Plan a trip' : 'Trip details'}
         className={`absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-xl shadow-slate-900/10 transition-[max-height] duration-200 ease-out lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[400px] lg:rounded-2xl lg:border-b lg:pb-0 ${
           expanded ? 'max-h-[85dvh]' : 'max-h-[calc(224px_+_env(safe-area-inset-bottom))]'
@@ -86,7 +89,7 @@ export default function App() {
             onClick={() => setSheetOpen(!sheetOpen)}
             aria-expanded={expanded}
             aria-label={expanded ? 'Collapse trip details' : 'Expand trip details'}
-            className="flex h-7 w-full shrink-0 items-center justify-center lg:hidden"
+            className="flex h-7 w-full shrink-0 items-center justify-center rounded-t-2xl focus-visible:-outline-offset-2 lg:hidden"
           >
             <span className="h-1.5 w-10 rounded-full bg-slate-300" />
           </button>
@@ -109,6 +112,8 @@ export default function App() {
             <>
               <TripSummary
                 result={result}
+                expanded={expanded}
+                onToggle={() => setSheetOpen(!sheetOpen)}
                 onEdit={() => { setEditing(true); setError(null) }}
                 onShowLogs={() => setShowLogs(true)}
               />
@@ -117,6 +122,9 @@ export default function App() {
           )}
         </div>
       </section>
+
+      {/* Over the map, which stays mounted so "back" returns to the same view */}
+      {showLogs && result && <LogsView result={result} onClose={() => setShowLogs(false)} />}
     </div>
   )
 }

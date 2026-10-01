@@ -11,6 +11,8 @@ TIMEOUT = 20
 METERS_PER_MILE = 1609.344
 EARTH_MILES = 3958.8
 MAX_ROUTE_POINTS = 1500
+# Same-named admin areas: the city wins over its township, county or state
+PLACE_RANK = {"locality": 0, "borough": 1, "localadmin": 2, "neighbourhood": 3, "county": 4, "region": 5}
 
 
 class LocationNotFound(Exception):
@@ -40,11 +42,20 @@ def coord_key(lat, lng):
     return (round(lat, 3), round(lng, 3))
 
 
+def _best_match(features):
+    """ORS can rank a county or township above the city itself ("Effingham, IL" -> the county,
+    "Springfield, IL" -> the township): take the most confident match, then prefer the city,
+    then the bigger place. Ties keep ORS's order."""
+    return min(features, key=lambda f: (-f["properties"].get("confidence", 0),
+                                        PLACE_RANK.get(f["properties"].get("layer"), 0),
+                                        -f["properties"].get("population", 0)))
+
+
 def geocode(text):
-    data = _get("/geocode/search", {"text": text, "size": 1, "boundary.country": "US"})
+    data = _get("/geocode/search", {"text": text, "size": 10, "boundary.country": "US"})
     if not data.get("features"):
         raise LocationNotFound(f"Could not find location: {text}")
-    f = data["features"][0]
+    f = _best_match(data["features"])
     lng, lat = f["geometry"]["coordinates"]
     return {"name": _place_name(f["properties"]), "lat": lat, "lng": lng}
 

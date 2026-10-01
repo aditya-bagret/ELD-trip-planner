@@ -12,7 +12,7 @@ const BIG = ['start', 'pickup', 'dropoff']
 const US_BOUNDS = [[24.5, -124.8], [49.4, -66.9]]
 
 // Padding keeps the bounds clear of the desktop side panel / mobile sheet (DESIGN §2).
-// sheetHeight: the peek sheet after a result; the taller form sheet before one.
+// sheetHeight: the peek sheet after a result; the measured form sheet before one.
 function fitView(map, bounds, sheetHeight = 240) {
   const desktop = window.matchMedia('(min-width: 1024px)').matches
   map.fitBounds(bounds, desktop
@@ -25,14 +25,14 @@ function popupTime(stop) {
   return `${formatDateTime(stop.start)} → ${formatEnd(stop.start, stop.end)} (${formatDuration(stop.duration_hours)})`
 }
 
-export default function RouteMap({ result, stops, focusStop, loading }) {
+export default function RouteMap({ result, stops, focusStop, loading, panel }) {
   const [map, setMap] = useState(null)
   const markers = useRef({})
 
   useEffect(() => {
     if (!map) return
     if (result) fitView(map, result.route)
-    else fitView(map, US_BOUNDS, window.innerHeight * 0.6)
+    else fitView(map, US_BOUNDS, panel.current.offsetHeight + 16)
   }, [map, result])
 
   useEffect(() => {

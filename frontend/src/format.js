@@ -1,10 +1,15 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Naive ISO "2026-10-01T08:15" → "Oct 1, 08:15" (no Date parsing, so no time-zone shifts)
+// "2026-10-01" → "Oct 1" (no Date parsing, so no time-zone shifts)
+export function formatDate(date) {
+  const [, month, day] = date.split('-')
+  return `${MONTHS[month - 1]} ${Number(day)}`
+}
+
+// Naive ISO "2026-10-01T08:15" → "Oct 1, 08:15"
 export function formatDateTime(iso) {
   const [date, time] = iso.split('T')
-  const [, month, day] = date.split('-')
-  return `${MONTHS[month - 1]} ${Number(day)}, ${time}`
+  return `${formatDate(date)}, ${time}`
 }
 
 // End of a span: just the time when it's on the same day as the start
